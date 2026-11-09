@@ -1,0 +1,156 @@
+<!DOCTYPE html><html lang="th"><head><meta charset="utf-8"><title>BYD Dolphin 2023 · 8-in-1 3D</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--p:rgba(13,21,31,.86);--t:#e8f0f8;--m:#8fa3b8;--a:#35d0ff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;height:100%;background:#0b1118;color:var(--t);font:13px/1.55 Prompt,system-ui,sans-serif;overflow:hidden}
+canvas{position:fixed;inset:0;width:100%;height:100%;touch-action:none}
+.pn{position:fixed;left:8px;right:8px;z-index:5;background:var(--p);backdrop-filter:blur(8px);border:1px solid #ffffff1c;border-radius:12px;padding:7px 10px;max-width:660px}
+#top{top:calc(env(safe-area-inset-top,0px) + 6px)}#bot{bottom:calc(env(safe-area-inset-bottom,0px) + 6px)}
+.r{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:5px}
+button{font:inherit;color:var(--t);background:#1b2a3a;border:1px solid #ffffff22;border-radius:999px;padding:3px 10px;cursor:pointer}
+button.on{background:var(--a);color:#021018;border-color:var(--a)}
+input[type=range]{width:84px;accent-color:#35d0ff}
+#chips{display:flex;gap:5px;overflow-x:auto;margin-top:6px;padding-bottom:2px}#chips button{white-space:nowrap;flex:none}
+#info{max-height:29vh;overflow:auto}#info p{margin:3px 0}
+.lb{position:fixed;transform:translate(-50%,-50%);font-size:10px;background:#000b;border:1px solid #35d0ff88;border-radius:8px;padding:0 5px;cursor:pointer;white-space:nowrap;z-index:2;color:#dff}.lb.on{background:#35d0ff;color:#021018}
+.sw{width:18px;height:18px;padding:0;border-radius:50%}small{color:var(--m)}
+</style></head><body>
+<canvas id="c"></canvas>
+<div class="pn" id="top"><b>BYD Dolphin 2023</b> · ชุดขับเคลื่อน 8-in-1 <small>ลาก=หมุน · บีบ/ล้อเมาส์=ซูม · แตะชิ้นส่วน=ดูการทำงาน</small>
+<div class="r" id="modes"></div>
+<div class="r"><label>คันเร่ง/ความเร็ว <input id="th" type="range" min="0" max="1" step=".01" value=".5"></label><label>โปร่งตัวถัง <input id="op" type="range" min="0" max="1" step=".01" value=".25"></label><label><input id="lbc" type="checkbox">ป้ายชื่อ</label></div>
+<div class="r"><b id="hud"></b><span id="sws" class="r" style="margin:0"></span></div></div>
+<div class="pn" id="bot"><div id="info"></div><div id="chips"></div></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const T=THREE,$=i=>document.getElementById(i),V=(x,y,z)=>new T.Vector3(x,y,z);
+const R=new T.WebGLRenderer({canvas:$('c'),antialias:true});R.setPixelRatio(Math.min(devicePixelRatio,2));R.localClippingEnabled=true;
+const S=new T.Scene();S.background=new T.Color(0x0b1118);S.fog=new T.Fog(0x0b1118,10,24);
+const cam=new T.PerspectiveCamera(40,1,.1,60);cam.position.set(4.6,2.2,4.4);
+const ctl=new T.OrbitControls(cam,$('c'));ctl.enableDamping=true;ctl.minDistance=.5;ctl.maxDistance=11;ctl.target.set(0,.6,0);ctl.maxPolarAngle=1.65;
+S.add(new T.HemisphereLight(0xcfe3ff,0x1b2430,.9));
+const d1=new T.DirectionalLight(0xffffff,1.1);d1.position.set(4,6,3);S.add(d1);
+const d2=new T.DirectionalLight(0x88aaff,.5);d2.position.set(-5,3,-4);S.add(d2);
+const fl=new T.Mesh(new T.CircleGeometry(9,64).rotateX(-Math.PI/2),new T.MeshBasicMaterial({color:0x0f1a26}));fl.position.y=-.01;S.add(fl);
+S.add(new T.GridHelper(18,36,0x1d4056,0x132736));
+
+/* ---------- ตัวถัง ---------- */
+const smooth=g=>{const p=g.attributes.position,n=g.attributes.normal,m={};for(let i=0;i<p.count;i++){const k=p.getX(i).toFixed(3)+','+p.getY(i).toFixed(3)+','+p.getZ(i).toFixed(3);(m[k]=m[k]||[]).push(i)}for(const k in m){const a=V(0,0,0);m[k].forEach(i=>a.add(V(n.getX(i),n.getY(i),n.getZ(i))));a.normalize();m[k].forEach(i=>n.setXYZ(i,a.x,a.y,a.z))}};
+function ext(pts,hw,bs,bt){const c=new T.CatmullRomCurve3(pts.map(p=>V(p[0],p[1],0)),true,'catmullrom',.25).getPoints(160);c.pop();
+ const g=new T.ExtrudeGeometry(new T.Shape(c.map(p=>new T.Vector2(p.x,p.y))),{depth:2*(hw-bt),bevelEnabled:true,bevelThickness:bt,bevelSize:bs,bevelSegments:6,curveSegments:1});
+ g.translate(0,0,-(hw-bt));const p=g.attributes.position;
+ for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),k=Math.min(Math.max((y-.8)/.7,0),1);p.setZ(i,p.getZ(i)*(1-.2*Math.pow(k,1.4))*(1-.14*Math.pow(Math.abs(x)/2.2,4)))}
+ g.computeVertexNormals();smooth(g);return g}
+const LP=[[-2.1,.34],[-1.87,.31],[-1.83,.55],[-1.7,.74],[-1.35,.82],[-1,.74],[-.87,.55],[-.83,.31],[-.5,.28],[.5,.28],[.83,.31],[.87,.55],[1,.74],[1.35,.82],[1.7,.74],[1.83,.55],[1.87,.31],[2.1,.36],[2.2,.55],[2.17,.76],[1.9,.88],[1.3,.96],[.7,1],[0,1.02],[-.8,1.02],[-1.6,1],[-2.08,.96],[-2.17,.7]];
+const GP=[[1,.97],[.55,1.2],[.15,1.42],[-.4,1.47],[-1,1.46],[-1.55,1.3],[-1.95,1.05],[-1.5,.97],[-.5,.96]];
+const body=new T.MeshPhongMaterial({color:0x2f86d6,specular:0xaaccee,shininess:120,transparent:true,opacity:.25,depthWrite:false});
+const glass=new T.MeshPhongMaterial({color:0x0c1822,specular:0xffffff,shininess:150,transparent:true,opacity:.3,depthWrite:false});
+const roofM=body.clone();roofM.clippingPlanes=[new T.Plane(V(0,1,0),-1.43)];roofM.side=T.DoubleSide;roofM.polygonOffset=true;roofM.polygonOffsetFactor=-2;roofM.polygonOffsetUnits=-2;
+const gg=ext(GP,.7,.08,.09);S.add(new T.Mesh(ext(LP,.86,.09,.1),body),new T.Mesh(gg,glass),new T.Mesh(gg,roofM));
+const lamp=new T.MeshBasicMaterial({color:0xeaf6ff}),tail=new T.MeshBasicMaterial({color:0xff2030});
+const add=(g,m,x,y,z)=>{const o=new T.Mesh(g,m);o.position.set(x,y,z);S.add(o)};
+[-1,1].forEach(s=>{add(new T.BoxGeometry(.1,.07,.12),body,.62,1.08,s*.86);add(new T.BoxGeometry(.04,.07,.3),lamp,2.22,.78,s*.55)});
+add(new T.BoxGeometry(.04,.06,1.4),tail,-2.2,.88,0);
+const axl=new T.CylinderGeometry(.03,.03,1.44,12).rotateX(Math.PI/2),axm=new T.MeshPhongMaterial({color:0xcfd6dd});add(axl,axm,1.35,.345,0);add(axl,axm,-1.35,.345,0);
+
+/* ---------- ชิ้นส่วน ---------- */
+const PARTS={},P={},W=[],ROT={};
+const Mt=(c,t)=>{const m=new T.MeshPhongMaterial({color:c,shininess:80,specular:0x667788});if(t){m.transparent=true;m.opacity=t}return m};
+const bx=(w,h,d,c,t)=>{const m=new T.Mesh(new T.BoxGeometry(w,h,d),Mt(c,t));m.add(new T.LineSegments(new T.EdgesGeometry(m.geometry),new T.LineBasicMaterial({color:0xffffff,transparent:true,opacity:.3})));return m};
+const cy=(r,l,c,t)=>new T.Mesh(new T.CylinderGeometry(r,r,l,32).rotateX(Math.PI/2),Mt(c,t));
+function part(id,x,y,z,fn){const g=new T.Group();g.position.set(x,y,z);g.userData.id=id;fn(g);S.add(g);PARTS[id]={g};P[id]=g.position.clone()}
+const cell=new T.MeshPhongMaterial({color:0x2ecc71,emissive:0x0a5a2a,shininess:60});
+part('bat',0,.3,0,g=>{g.add(bx(1.78,.14,1.34,0x2a3442,.45));for(let i=0;i<34;i++){const c=new T.Mesh(new T.BoxGeometry(.03,.09,1.2),cell);c.position.x=(i-16.5)*.05;g.add(c)}});
+[['obc',1.58,.27,0x3b82f6],['pdu',1.58,0,0xe8772e],['dcdc',1.58,-.27,0x22b573],['bms',1.28,.27,0xd946a8],['inv',1.28,0,0x8b5cf6],['vcu',1.28,-.27,0x06b6d4]].forEach(([id,x,z,c])=>part(id,x,.68,z,g=>{g.add(bx(.24,.12,.24,c));const t=bx(.12,.02,.12,0xffffff);t.position.y=.07;g.add(t)}));
+part('mot',.98,.5,0,g=>{g.add(cy(.16,.34,0x9aa7b4,.5));const r=new T.Group();r.add(cy(.09,.4,0xd98a3a));for(let i=0;i<6;i++){const p=new T.Group(),f=bx(.04,.07,.3,0xffb347);f.position.y=.1;p.add(f);p.rotation.z=i*Math.PI/3;r.add(p)}g.add(r);ROT.m=r});
+part('red',1.35,.34,0,g=>{g.add(cy(.17,.24,0xb8923a,.5));const r=new T.Group();r.add(cy(.11,.2,0xe2e8f0));for(let i=0;i<10;i++){const p=new T.Group(),f=bx(.035,.05,.2,0xe2e8f0);f.position.y=.12;p.add(f);p.rotation.z=i*Math.PI/5;r.add(p)}g.add(r);ROT.r=r});
+part('lv',1.83,.68,-.5,g=>{g.add(bx(.3,.2,.17,0x2d3748));[-.08,.08].forEach(z=>{const t=bx(.04,.04,.04,z<0?0x222222:0xff3b3b);t.position.set(.08,.12,z);g.add(t)})});
+part('port',2.2,.64,.42,g=>{const c=cy(.075,.06,0x111418);c.rotation.set(0,0,Math.PI/2);c.rotation.order='ZYX';c.geometry=new T.CylinderGeometry(.075,.075,.06,24).rotateZ(Math.PI/2);g.add(c);const q=new T.Mesh(new T.TorusGeometry(.075,.012,8,24).rotateY(Math.PI/2),new T.MeshPhongMaterial({color:0x2ecc71,emissive:0x1a8f4a}));q.position.x=.03;g.add(q)});
+part('wheel',0,0,0,g=>{[[1.35,.72],[1.35,-.72],[-1.35,.72],[-1.35,-.72]].forEach(([x,z])=>{const w=new T.Group(),s=new T.Group();w.position.set(x,.345,z);const t=new T.Mesh(new T.TorusGeometry(.265,.08,16,48),Mt(0x14171b));t.scale.z=1.5;s.add(t,cy(.215,.17,0xcfd6dd));for(let i=0;i<5;i++){const p=new T.Group(),sp=bx(.045,.19,.03,0x2b3139);sp.position.set(0,.11,Math.sign(z)*.09);p.add(sp);p.rotation.z=i*Math.PI*2/5;s.add(p)}w.add(s);g.add(w);W.push(s)})});
+P.wheel=V(1.35,.34,.72);
+const cas=new T.Mesh(new T.BoxGeometry(1.0,.55,.9),new T.MeshBasicMaterial({color:0x35d0ff,transparent:true,opacity:.07,depthWrite:false}));cas.position.set(1.25,.52,0);
+cas.add(new T.LineSegments(new T.EdgesGeometry(cas.geometry),new T.LineBasicMaterial({color:0x35d0ff,transparent:true,opacity:.7})));S.add(cas);
+
+/* ---------- เส้นกระแส ---------- */
+const C={hv:0xff8a1f,ac:0x4aa3ff,t3:0xc26bff,lv:0x3ddc84,sg:0x22e5ff,me:0xffd23f};
+const TY={hv:'DC แรงสูง',ac:'AC จากสถานี',t3:'AC 3 เฟส',lv:'DC 12V',sg:'สัญญาณ',me:'แรงหมุน'};
+P.wl=V(1.35,.345,-.72);P.wr=V(1.35,.345,.72);
+const SEG=[['port-obc','port','obc','ac',[V(1.95,.76,.36)]],['port-pdu','port','pdu','hv',[V(1.95,.84,.1)]],['obc-pdu','obc','pdu','hv',[V(1.58,.8,.14)]],
+['pdu-bat','pdu','bat','hv',[V(1.74,.5,.36),V(.9,.26,.36)]],['pdu-inv','pdu','inv','hv',[V(1.43,.78,0)]],['inv-mot','inv','mot','t3',[V(1.1,.78,0)]],['mot-red','mot','red','me',[]],
+['red-wl','red','wl','me',[]],['red-wr','red','wr','me',[]],['pdu-dcdc','pdu','dcdc','hv',[V(1.58,.8,-.14)]],['dcdc-lv','dcdc','lv','lv',[V(1.7,.76,-.4)]],['lv-vcu','lv','vcu','lv',[V(1.5,.84,-.42)]],
+['vcu-inv','vcu','inv','sg',[V(1.28,.8,-.14)]],['vcu-bms','vcu','bms','sg',[V(1.28,.86,0)]],['bms-bat','bms','bat','sg',[V(1,.4,.48),V(.6,.28,.5)]]].map(([id,a,b,t,via])=>{
+ const cv=new T.CatmullRomCurve3([P[a],...via,P[b]]),tube=new T.Mesh(new T.TubeGeometry(cv,32,.011,6),new T.MeshBasicMaterial({color:C[t],transparent:true}));S.add(tube);return{id,a,b,t,cv,tube,hit:false}});
+const MF={drive:{'pdu-bat':-1,'pdu-inv':1,'inv-mot':1,'mot-red':1,'red-wl':1,'red-wr':1,'pdu-dcdc':1,'dcdc-lv':1,'lv-vcu':1,'vcu-inv':1,'vcu-bms':1,'bms-bat':-1},
+ac:{'port-obc':1,'obc-pdu':1,'pdu-bat':1,'pdu-dcdc':1,'dcdc-lv':1,'lv-vcu':1,'vcu-bms':1,'bms-bat':-1},
+dc:{'port-pdu':1,'pdu-bat':1,'pdu-dcdc':1,'dcdc-lv':1,'lv-vcu':1,'vcu-bms':1,'bms-bat':-1},
+regen:{'pdu-bat':1,'pdu-inv':-1,'inv-mot':-1,'mot-red':-1,'red-wl':-1,'red-wr':-1,'pdu-dcdc':1,'dcdc-lv':1,'lv-vcu':1,'vcu-inv':1,'vcu-bms':1,'bms-bat':-1}};
+const MT={drive:['ขับเคลื่อน','แบต → PDU → อินเวอร์เตอร์ → มอเตอร์ → เกียร์ทด → ล้อหน้า | PDU → DC-DC → แบต 12V → VCU'],ac:['ชาร์จ AC','ช่องชาร์จ → OBC (แปลง AC เป็น DC) → PDU → แบต | BMS คุมการชาร์จ'],dc:['ชาร์จ DC เร็ว','ช่องชาร์จ → PDU → แบต (ข้าม OBC เพราะสถานีแปลงไฟมาให้แล้ว)'],regen:['เบรกคืนพลังงาน','ล้อ → เกียร์ทด → มอเตอร์ (กลายเป็นเครื่องกำเนิดไฟ) → อินเวอร์เตอร์ → PDU → แบต']};
+const D={
+bat:['แบตเตอรี่ Blade (LFP)','แบตลิเธียมเหล็กฟอสเฟต เซลล์แบนยาวเรียงเหมือนใบมีด วางใต้พื้นรถ ปลอดภัยสูงและช่วยรับแรงของตัวถัง เป็นถังพลังงานของรถ','ความจุ 44.9 / 60.4 kWh ตามรุ่น · จ่าย–รับไฟ DC แรงสูง'],
+mot:['มอเตอร์ขับเคลื่อน (PMSM)','รับไฟ AC 3 เฟสจากอินเวอร์เตอร์ สร้างสนามแม่เหล็กหมุนให้โรเตอร์หมุน ส่งแรงบิดไปเกียร์ทด ตอนเบรกจะกลับเป็นเครื่องกำเนิดไฟ','ราว 70 kW/180 N·m (Standard) · 150 kW/310 N·m (Extended)'],
+red:['เกียร์ทดรอบ (Reducer)','เกียร์อัตราทดคงที่ตัวเดียว ลดรอบมอเตอร์ เพิ่มแรงบิด ไม่มีคลัตช์/เกียร์หลายสปีด แล้วส่งกำลังไปเพลาล้อหน้า','ขับเคลื่อนล้อหน้า (FWD)'],
+inv:['อินเวอร์เตอร์ / ตัวควบคุมมอเตอร์','รับคำสั่งแรงบิดจาก VCU แล้วแปลง DC จากแบตเป็น AC 3 เฟส ปรับความถี่และแรงดันเพื่อคุมรอบ/แรงบิด ตอนเบรกจะกลับทิศ แปลง AC จากมอเตอร์เป็น DC ชาร์จแบต','สวิตช์ไฟกำลังสูง'],
+obc:['OBC – เครื่องชาร์จบนรถ','แปลงไฟ AC จากเต้าเสียบ/วอลล์บ็อกซ์เป็น DC แรงสูงเพื่อชาร์จแบต ใช้เฉพาะตอนชาร์จ AC','ชาร์จ AC ราว 7 kW'],
+dcdc:['DC-DC Converter','ลด DC แรงสูงเหลือ 12V ทำหน้าที่แทนไดชาร์จ เลี้ยงแบต 12V และอุปกรณ์ไฟต่ำ เช่น ไฟส่องสว่าง จอ ปั๊มน้ำ','HV DC → 12V DC'],
+pdu:['PDU – หน่วยกระจายไฟแรงสูง','เหมือนตู้ไฟของระบบแรงสูง มีคอนแทคเตอร์ตัด-ต่อไฟ ส่งไฟจากแบตไปอินเวอร์เตอร์/DC-DC/แอร์ และรับไฟชาร์จเข้าแบต ตัดไฟทันทีเมื่อ BMS สั่ง','ศูนย์กลางไฟ DC แรงสูง'],
+vcu:['VCU – คอมพิวเตอร์ควบคุมรถ','สมองของรถ อ่านคันเร่ง เบรก เกียร์ สถานะแบต แล้วสั่งแรงบิดให้อินเวอร์เตอร์ผ่านสาย CAN ไม่ส่งกระแสแรงสูง มีแต่สัญญาณและไฟ 12V','สื่อสารผ่านบัส CAN'],
+bms:['BMS – ระบบจัดการแบต','วัดแรงดัน อุณหภูมิ กระแสของเซลล์ คำนวณ SOC สมดุลเซลล์ และสั่ง PDU ตัดไฟเมื่อชาร์จเกิน คายเกิน หรือร้อนผิดปกติ','รับสัญญาณเซ็นเซอร์จากแพ็กแบต'],
+lv:['แบตเตอรี่ 12V','แบตเล็กสำหรับปลุกระบบตอนสตาร์ท (ปิดคอนแทคเตอร์ไฟแรงสูง) และจ่ายอุปกรณ์ไฟต่ำ ขณะรถเปิดจะถูก DC-DC ชาร์จเติมตลอด','12V'],
+port:['ช่องชาร์จ (CCS2)','รับไฟจากสถานีชาร์จ ถ้าเป็น AC ไฟวิ่งเข้า OBC ถ้าเป็น DC เร็วไฟเข้า PDU แล้วลงแบตตรง ๆ','AC / DC ในช่องเดียว'],
+wheel:['ล้อ (ขับเคลื่อนล้อหน้า)','รับแรงหมุนจากเพลาที่ต่อกับเกียร์ทด ตอนเบรกคืนพลังงาน แรงหมุนของล้อจะย้อนกลับไปหมุนมอเตอร์ให้เป็นเครื่องกำเนิดไฟ','ล้อหน้า 2 ล้อขับเคลื่อน']};
+const SN={bat:'แบต Blade',mot:'มอเตอร์',red:'เกียร์ทด',inv:'อินเวอร์เตอร์',obc:'OBC',dcdc:'DC-DC',pdu:'PDU',vcu:'VCU',bms:'BMS',lv:'แบต 12V',port:'ช่องชาร์จ',wheel:'ล้อ'};
+const K=i=>/^w[lr]$/.test(i)?'wheel':i;
+const F={bat:[2.4,1.6,2.6],wheel:[1.2,.6,1.7],port:[1,.5,1.2],mot:[.8,.7,1.2]};
+const LG=Object.keys(C).map(k=>`<span style="color:#${C[k].toString(16)}">●</span> ${TY[k]}`).join(' &nbsp;')+'<br>8-in-1 = มอเตอร์ + เกียร์ทด + อินเวอร์เตอร์ + OBC + DC-DC + PDU + VCU + BMS (กรอบฟ้าที่ด้านหน้า) · ตำแหน่งภายในเป็นแบบจำลองเพื่ออธิบาย';
+
+/* ---------- อนุภาคกระแส ---------- */
+const N=SEG.length*8,pos=new T.BufferAttribute(new Float32Array(N*3),3),col=new T.BufferAttribute(new Float32Array(N*3),3);
+const cvs=document.createElement('canvas');cvs.width=cvs.height=32;const cx=cvs.getContext('2d'),gr=cx.createRadialGradient(16,16,0,16,16,16);gr.addColorStop(0,'#fff');gr.addColorStop(.5,'#fff');gr.addColorStop(1,'rgba(255,255,255,0)');cx.fillStyle=gr;cx.fillRect(0,0,32,32);
+const pg=new T.BufferGeometry();pg.setAttribute('position',pos);pg.setAttribute('color',col);
+const pts=new T.Points(pg,new T.PointsMaterial({size:.075,map:new T.CanvasTexture(cvs),vertexColors:true,transparent:true,depthWrite:false,blending:T.AdditiveBlending}));pts.frustumCulled=false;S.add(pts);
+
+/* ---------- สถานะ + UI ---------- */
+let mode='drive',sel=null,hp=null,soc=60,sp=0,tm=0,fly=null;
+const go=(tg,o)=>fly={t:0,a:ctl.target.clone(),b:tg.clone(),c:cam.position.clone(),d:tg.clone().add(o)};
+const LB={},LPs={};
+for(const id in D){const l=document.createElement('div');l.className='lb';l.textContent=SN[id];l.onclick=()=>pick(id);document.body.appendChild(l);LB[id]=l;LPs[id]=P[id].clone().add(V(0,.12,0))}
+$('lbc').checked=innerWidth>700;
+function paint(){SEG.forEach((s,j)=>{const d=MF[mode][s.id],f=sel?(s.hit?1:.3):1,c=new T.Color(C[s.t]).multiplyScalar(f);s.tube.material.opacity=d?.2+.65*f:.07;for(let i=0;i<8;i++)col.setXYZ(j*8+i,c.r,c.g,c.b)});col.needsUpdate=true}
+function ui(){[...$('chips').children].forEach(b=>b.classList.toggle('on',(b.dataset.i||'')==(sel||'')));[...$('modes').children].forEach(b=>b.classList.toggle('on',b.dataset.i==mode));for(const i in LB)LB[i].classList.toggle('on',i==sel);
+ let h;if(sel){const[n,d,s]=D[sel],a=[],o=[],u=(r,x)=>r.includes(x)||r.push(x);
+  SEG.forEach(q=>{const dr=MF[mode][q.id];if(!dr)return;const A=K(dr>0?q.a:q.b),B=K(dr>0?q.b:q.a),t=TY[q.t];if(A==sel)u(o,SN[B]+' ('+t+')');if(B==sel)u(a,SN[A]+' ('+t+')')});
+  h=`<b style="color:var(--a)">${n}</b><p>${d}</p><p><small>${s}</small></p><p>⚡ โหมด${MT[mode][0]}: `+(a.length||o.length?(a.length?'รับจาก <b>'+a.join(', ')+'</b> ':'')+(o.length?'→ ส่งไป <b>'+o.join(', ')+'</b>':''):'ไม่ได้ทำงานในโหมดนี้ (สแตนด์บาย)')+'</p>'}
+ else h=`<b>โหมด${MT[mode][0]}</b><p>กระแสวิ่ง: ${MT[mode][1]}</p><p><small>${LG}</small></p>`;$('info').innerHTML=h}
+function pick(id,fy=true){sel=id;if(hp){S.remove(hp);hp=null}
+ if(id){hp=new T.Box3Helper(new T.Box3().setFromObject(PARTS[id].g),0x35d0ff);S.add(hp)}
+ if(fy){if(id){const p=P[id],f=F[id]||[.9,.7,1.2];go(p,V(f[0],f[1],f[2]*(p.z<-.1?-1:1)))}else go(V(0,.6,0),V(4.6,1.6,4.4))}
+ SEG.forEach(s=>s.hit=!!id&&(K(s.a)==id||K(s.b)==id));paint();ui()}
+function setMode(m){mode=m;paint();ui()}
+for(const m in MT){const b=document.createElement('button');b.textContent=MT[m][0];b.dataset.i=m;b.onclick=()=>setMode(m);$('modes').appendChild(b)}
+const ov=document.createElement('button');ov.textContent='ภาพรวม';ov.dataset.i='';ov.onclick=()=>pick(null);$('chips').appendChild(ov);
+for(const id in D){const b=document.createElement('button');b.textContent=SN[id];b.dataset.i=id;b.onclick=()=>pick(id);$('chips').appendChild(b)}
+[['#2f86d6','Surf Blue'],['#e8edf1','Ski White'],['#f0a37f','Apricot']].forEach(([c,n])=>{const b=document.createElement('button');b.className='sw';b.style.background=c;b.title=n;b.onclick=()=>{body.color.set(c);roofM.color.set(c)};$('sws').appendChild(b)});
+$('op').oninput=e=>{const v=+e.target.value;body.opacity=roofM.opacity=v;glass.opacity=Math.min(1,v*.8+.08)};
+const rc=new T.Raycaster(),mp=new T.Vector2();let dn=null;
+$('c').addEventListener('pointerdown',e=>dn=[e.clientX,e.clientY]);
+$('c').addEventListener('pointerup',e=>{if(!dn||Math.hypot(e.clientX-dn[0],e.clientY-dn[1])>6)return;mp.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1);rc.setFromCamera(mp,cam);
+ const h=rc.intersectObjects(Object.values(PARTS).map(p=>p.g),true)[0];if(h){let o=h.object;while(o&&!o.userData.id)o=o.parent;if(o)pick(o.userData.id)}else if(sel)pick(null,false)});
+const rs=()=>{R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()};addEventListener('resize',rs);rs();
+pick(null,false);
+
+/* ---------- วนลูปแอนิเมชัน ---------- */
+const clk=new T.Clock(),tmp=V(0,0,0);
+(function L(){requestAnimationFrame(L);const dt=Math.min(clk.getDelta(),.05);tm+=dt;const th=+$('th').value,mv=mode=='drive'||mode=='regen';
+ sp+=((mv?th*16:0)-sp)*Math.min(1,dt*2);W.forEach(w=>w.rotation.z-=sp*dt);ROT.m.rotation.z-=sp*dt*5;ROT.r.rotation.z-=sp*dt*2;
+ const rt={drive:-th*.9,ac:.5,dc:1.6,regen:th*.5}[mode];soc=Math.min(100,Math.max(3,soc+(rt>0&&soc>=100?0:rt)*dt));cell.emissive.setHSL(.4,.7,.05+.2*soc/100);
+ $('hud').textContent='SOC '+soc.toFixed(0)+'% · '+{drive:'จ่าย '+(th*150).toFixed(0)+' kW',ac:'ชาร์จ 7 kW',dc:'ชาร์จ 60 kW',regen:'คืน '+(th*50).toFixed(0)+' kW'}[mode];
+ if(fly){fly.t=Math.min(1,fly.t+dt*1.6);const k=fly.t*fly.t*(3-2*fly.t);ctl.target.lerpVectors(fly.a,fly.b,k);cam.position.lerpVectors(fly.c,fly.d,k);if(fly.t>=1)fly=null}
+ ctl.update();
+ const fw=mode=='ac'?.4:mode=='dc'?.8:.2+.6*th;
+ SEG.forEach((s,j)=>{const d=MF[mode][s.id]||0,v=s.t=='sg'?.5:fw;for(let i=0;i<8;i++){const k=j*8+i;if(d){s.cv.getPointAt((((tm*v*d+i/8)%1)+1)%1,tmp);pos.setXYZ(k,tmp.x,tmp.y,tmp.z)}else pos.setXYZ(k,0,-50,0)}});pos.needsUpdate=true;
+ const on=$('lbc').checked;for(const id in LB){const l=LB[id];if(!on){l.style.display='none';continue}tmp.copy(LPs[id]).project(cam);if(tmp.z>1){l.style.display='none';continue}l.style.display='';l.style.left=(tmp.x*.5+.5)*innerWidth+'px';l.style.top=(-tmp.y*.5+.5)*innerHeight+'px'}
+ R.render(S,cam)})();
+</script></body></html>
